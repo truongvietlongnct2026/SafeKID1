@@ -1,0 +1,6 @@
+{
+  "name": "KidEye Guard",
+  "description": "Ứng dụng web bảo vệ mắt trẻ em tối ưu cho Safari trên iPhone 14 Plus, sử dụng camera trước và MediaPipe FaceLandmarker để cảnh báo khoảng cách an toàn.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
