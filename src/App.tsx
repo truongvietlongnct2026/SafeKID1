@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { BlackoutOverlay } from './components/BlackoutOverlay';
+import { OfflineIndicator, PWAInstallButton } from './components/PWAInstallButton';
 import { PinModal, type PinModalMode } from './components/PinModal';
 import { SafeYouTubeSection } from './components/SafeYouTubeSection';
 import { SettingsCameraModal } from './components/SettingsCameraModal';
@@ -262,26 +263,31 @@ export default function App() {
       {/* Compact Top Bar (hidden when edge-to-edge player covers screen) */}
       {!isExpanded && (
         <header className="sticky top-0 z-30 pt-safe bg-white/90 backdrop-blur-md border-b border-slate-200">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
             <span className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
               KidEye Guard
             </span>
 
-            <button
-              type="button"
-              onClick={openPinForSettingsCamera}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-blue-600" aria-hidden="true" />
-              <span>Cài đặt & Camera</span>
-              <Lock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <PWAInstallButton />
+
+              <button
+                type="button"
+                onClick={openPinForSettingsCamera}
+                className="min-h-[44px] px-3 sm:px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                <span>Cài đặt & Camera</span>
+                <Lock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </header>
       )}
 
       {/* Main Content Optimized for iPhone 14 Plus Portrait Safari */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 pb-safe space-y-4">
+        {!isExpanded && <OfflineIndicator />}
         {/* Compact Always-Mounted Camera Protection Strip (stays non-display:none behind z-40 during expanded mode so Safari keeps decoding frames) */}
         <section
           aria-hidden={isExpanded}
