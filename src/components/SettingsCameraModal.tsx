@@ -36,6 +36,7 @@ interface SettingsCameraModalProps {
   onToggleDebug: () => void;
   onCalibrateAt40Cm: () => void;
   onResetCalibration: () => void;
+  onTogglePinLock: () => void;
   onOpenChangePin: () => void;
 }
 
@@ -63,6 +64,7 @@ export function SettingsCameraModal({
   onToggleDebug,
   onCalibrateAt40Cm,
   onResetCalibration,
+  onTogglePinLock,
   onOpenChangePin,
 }: SettingsCameraModalProps) {
   const mirrorCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -122,7 +124,7 @@ export function SettingsCameraModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-camera-title"
-      className="fixed inset-0 z-40 bg-slate-950/65 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
     >
       <div className="w-full sm:max-w-xl max-h-[92dvh] bg-slate-50 rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
         {/* Sticky Sheet Header */}
@@ -431,6 +433,52 @@ export function SettingsCameraModal({
                 <span
                   className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
                     settings.debugMode ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <hr className="border-slate-100" />
+
+            {/* PIN Lock on Thu nhỏ / Exit Fullscreen */}
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={onTogglePinLock}
+                className="flex-1 min-h-[44px] flex items-center gap-3 text-left"
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    settings.pinLockEnabled
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <Lock className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-slate-900">
+                    Khóa nút Thu nhỏ bằng PIN
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Yêu cầu mã PIN 4 số để thoát chế độ tràn màn hình
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.pinLockEnabled}
+                aria-label="Khóa nút Thu nhỏ bằng mã PIN 4 số"
+                onClick={onTogglePinLock}
+                className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors ${
+                  settings.pinLockEnabled ? 'bg-blue-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
+                    settings.pinLockEnabled ? 'translate-x-7' : 'translate-x-1'
                   }`}
                 />
               </button>

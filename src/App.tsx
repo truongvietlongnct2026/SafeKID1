@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Camera,
@@ -42,6 +42,10 @@ function loadSavedSettings(): GuardSettings {
         typeof parsed.autoLockOnStart === 'boolean'
           ? parsed.autoLockOnStart
           : DEFAULT_SETTINGS.autoLockOnStart,
+      pinLockEnabled:
+        typeof parsed.pinLockEnabled === 'boolean'
+          ? parsed.pinLockEnabled
+          : DEFAULT_SETTINGS.pinLockEnabled,
       pinCode:
         typeof parsed.pinCode === 'string' && /^\d{4}$/.test(parsed.pinCode)
           ? parsed.pinCode
@@ -61,10 +65,15 @@ function loadSavedSettings(): GuardSettings {
 export default function App() {
   const [settings, setSettings] = useState<GuardSettings>(loadSavedSettings);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isExpandedRef = useRef(false);
+  isExpandedRef.current = isExpanded;
+  const autoExpandedByLandscapeRef = useRef(false);
+
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [pinModalMode, setPinModalMode] = useState<PinModalMode>('unlock');
   const [pendingAction, setPendingAction] = useState<
-    'open_settings_camera' | 'emergency_stop'
+    'open_settings_camera' | 'emergency_stop' | 'collapse_expanded'
   >('open_settings_camera');
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
 
@@ -98,6 +107,52 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [feedbackNotice]);
 
+  // Automatically enable edge-to-edge mode when iPhone rotates to landscape (and return on portrait)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const landscapeQuery = window.matchMedia('(orientation: landscape) and (max-height: 540px)');
+
+    const checkOrientation = () => {
+      const isMobileLandscape =
+        landscapeQuery.matches ||
+        (window.innerWidth > window.innerHeight && window.innerHeight <= 540);
+
+      if (isMobileLandscape) {
+        if (!isExpandedRef.current) {
+          autoExpandedByLandscapeRef.current = true;
+          setIsExpanded(true);
+        }
+      } else if (autoExpandedByLandscapeRef.current) {
+        autoExpandedByLandscapeRef.current = false;
+        setIsExpanded(false);
+      }
+    };
+
+    checkOrientation();
+
+    const handleChange = () => checkOrientation();
+    landscapeQuery.addEventListener('change', handleChange);
+    window.addEventListener('orientationchange', handleChange);
+    window.addEventListener('resize', handleChange);
+
+    return () => {
+      landscapeQuery.removeEventListener('change', handleChange);
+      window.removeEventListener('orientationchange', handleChange);
+      window.removeEventListener('resize', handleChange);
+    };
+  }, []);
+
+  // Prevent background body scroll while edge-to-edge player is active
+  useEffect(() => {
+    if (!isExpanded) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isExpanded]);
+
   const showNotice = useCallback((msg: string | null) => {
     setFeedbackNotice(msg);
   }, []);
@@ -112,6 +167,22 @@ export default function App() {
     setPendingAction('emergency_stop');
     setPinModalMode('unlock');
     setPinModalOpen(true);
+  };
+
+  const handleRequestExpand = () => {
+    autoExpandedByLandscapeRef.current = false;
+    setIsExpanded(true);
+  };
+
+  const handleRequestCollapse = () => {
+    if (settings.pinLockEnabled) {
+      setPendingAction('collapse_expanded');
+      setPinModalMode('unlock');
+      setPinModalOpen(true);
+      return;
+    }
+    autoExpandedByLandscapeRef.current = false;
+    setIsExpanded(false);
   };
 
   const handleToggleSound = async () => {
@@ -188,31 +259,38 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 text-slate-900 flex flex-col">
-      {/* Compact Top Bar with PIN-Protected "Cài đặt & Camera" Button */}
-      <header className="sticky top-0 z-30 pt-safe bg-white/90 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          <span className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
-            KidEye Guard
-          </span>
+      {/* Compact Top Bar (hidden when edge-to-edge player covers screen) */}
+      {!isExpanded && (
+        <header className="sticky top-0 z-30 pt-safe bg-white/90 backdrop-blur-md border-b border-slate-200">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+            <span className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+              KidEye Guard
+            </span>
 
-          <button
-            type="button"
-            onClick={openPinForSettingsCamera}
-            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-blue-600" aria-hidden="true" />
-            <span>Cài đặt & Camera</span>
-            <Lock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              onClick={openPinForSettingsCamera}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-blue-600" aria-hidden="true" />
+              <span>Cài đặt & Camera</span>
+              <Lock className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* Main Content Optimized for iPhone 14 Plus Portrait Safari */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 pb-safe space-y-4">
-        {/* Compact Always-Mounted Camera Protection Strip (keeps Safari MediaStream & FaceLandmarker running!) */}
-        <section className="bg-white rounded-2xl border border-slate-200 px-3.5 py-2.5 shadow-sm flex items-center justify-between gap-3">
+        {/* Compact Always-Mounted Camera Protection Strip (stays non-display:none behind z-40 during expanded mode so Safari keeps decoding frames) */}
+        <section
+          aria-hidden={isExpanded}
+          className={`bg-white rounded-2xl border border-slate-200 px-3.5 py-2.5 shadow-sm flex items-center justify-between gap-3 ${
+            isExpanded ? 'pointer-events-none opacity-0' : ''
+          }`}
+        >
           <div className="flex items-center gap-3 min-w-0">
-            {/* Persistent live mini camera preview (never display:none so iOS Safari never pauses video) */}
+            {/* Persistent live mini camera preview */}
             <div className="relative w-14 h-10 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shrink-0 flex items-center justify-center">
               <video
                 ref={videoRef}
@@ -267,7 +345,7 @@ export default function App() {
           )}
         </section>
 
-        {status === 'error' && errorMessage && (
+        {!isExpanded && status === 'error' && errorMessage && (
           <div
             role="alert"
             className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-red-900 text-xs leading-relaxed"
@@ -276,7 +354,7 @@ export default function App() {
           </div>
         )}
 
-        {feedbackNotice && (
+        {!isExpanded && feedbackNotice && (
           <div
             role="status"
             className="px-4 py-2.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-medium"
@@ -285,9 +363,18 @@ export default function App() {
           </div>
         )}
 
-        {/* Primary Main Screen: Góc xem YouTube an toàn */}
+        {/* Primary Main Screen: Góc xem YouTube an toàn (with Edge-to-Edge CSS expansion) */}
         <SafeYouTubeSection
           isBlackoutActive={isBlackoutActive}
+          isExpanded={isExpanded}
+          isMonitoring={isMonitoring}
+          status={status}
+          distanceCm={telemetry.smoothedDistanceCm}
+          thresholdCm={settings.thresholdCm}
+          pinLockEnabled={settings.pinLockEnabled}
+          onExpand={handleRequestExpand}
+          onCollapse={handleRequestCollapse}
+          onStartMonitoring={() => void startMonitoring()}
           onPlaybackSyncMessage={showNotice}
         />
       </main>
@@ -318,13 +405,16 @@ export default function App() {
         }
         onCalibrateAt40Cm={handleCalibrateAt40Cm}
         onResetCalibration={handleResetCalibration}
+        onTogglePinLock={() =>
+          setSettings((prev) => ({ ...prev, pinLockEnabled: !prev.pinLockEnabled }))
+        }
         onOpenChangePin={() => {
           setPinModalMode('change');
           setPinModalOpen(true);
         }}
       />
 
-      {/* Fullscreen Pure Black (#000000) Shield Overlay */}
+      {/* Fullscreen Pure Black (#000000) Shield Overlay (z-index: 9999) */}
       <BlackoutOverlay
         visible={isBlackoutActive}
         status={status}
@@ -335,7 +425,7 @@ export default function App() {
         onRequestParentUnlock={openPinForEmergencyStop}
       />
 
-      {/* 4-Digit Parent PIN Modal */}
+      {/* 4-Digit Parent PIN Modal (z-index: 10000) */}
       <PinModal
         isOpen={pinModalOpen}
         mode={pinModalMode}
@@ -344,14 +434,18 @@ export default function App() {
           pinModalMode === 'unlock'
             ? pendingAction === 'emergency_stop'
               ? 'Phụ huynh xác nhận PIN'
-              : 'Mở khóa Cài đặt & Camera'
+              : pendingAction === 'collapse_expanded'
+                ? 'Thu nhỏ màn hình xem'
+                : 'Mở khóa Cài đặt & Camera'
             : undefined
         }
         subtitle={
           pinModalMode === 'unlock'
             ? pendingAction === 'emergency_stop'
               ? 'Nhập mã PIN 4 số để tắt bảo vệ và mở lại màn hình.'
-              : 'Nhập mã PIN 4 số để chỉnh ngưỡng khoảng cách hoặc tắt giám sát.'
+              : pendingAction === 'collapse_expanded'
+                ? 'Nhập mã PIN 4 số của phụ huynh để thoát chế độ tràn màn hình.'
+                : 'Nhập mã PIN 4 số để chỉnh ngưỡng khoảng cách hoặc tắt giám sát.'
             : undefined
         }
         onClose={() => setPinModalOpen(false)}
@@ -361,6 +455,9 @@ export default function App() {
             emergencyUnlockBlackout();
             setSettingsModalOpen(true);
             showNotice('Đã tắt giám sát và mở Cài đặt & Camera.');
+          } else if (pendingAction === 'collapse_expanded') {
+            autoExpandedByLandscapeRef.current = false;
+            setIsExpanded(false);
           } else {
             setSettingsModalOpen(true);
           }

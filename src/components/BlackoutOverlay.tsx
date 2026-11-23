@@ -35,7 +35,7 @@ export function BlackoutOverlay({
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="blackout-title"
-      className="fixed inset-0 z-50 bg-[#000000] text-white flex flex-col items-center justify-between px-6 pt-safe pb-safe select-none"
+      className="fixed inset-0 z-[9999] bg-[#000000] text-white flex flex-col items-center justify-between px-6 pt-safe pb-safe select-none"
     >
       {/* Top quiet header */}
       <div className="w-full max-w-md pt-6 flex items-center justify-between text-xs text-neutral-400">

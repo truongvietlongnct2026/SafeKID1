@@ -13,6 +13,7 @@ export interface GuardSettings {
   soundEnabled: boolean;
   debugMode: boolean;
   autoLockOnStart: boolean;
+  pinLockEnabled: boolean;
   pinCode: string;
   calibrationFactor: number;
 }
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: GuardSettings = {
   soundEnabled: true,
   debugMode: false,
   autoLockOnStart: true,
+  pinLockEnabled: true,
   pinCode: DEFAULT_PIN,
   calibrationFactor: 1.0,
 };

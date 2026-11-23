@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  AlertCircle,
+  Camera,
+  ExternalLink,
+  Eye,
+  Loader2,
+  Lock,
+  Maximize2,
+  Minimize2,
+  Play,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react';
+import type { GuardStatus } from '../types/guard';
 
 interface YTPlayer {
   playVideo: () => void;
@@ -88,6 +101,15 @@ interface YouTubeSafePlayerProps {
   videoId: string;
   autoplayRequestKey: number;
   isBlackoutActive: boolean;
+  isExpanded: boolean;
+  isMonitoring: boolean;
+  status: GuardStatus;
+  distanceCm: number | null;
+  thresholdCm: number;
+  pinLockEnabled: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
+  onStartMonitoring: () => void;
   onPlaybackSyncMessage?: (msg: string | null) => void;
 }
 
@@ -95,6 +117,15 @@ export function YouTubeSafePlayer({
   videoId,
   autoplayRequestKey,
   isBlackoutActive,
+  isExpanded,
+  isMonitoring,
+  status,
+  distanceCm,
+  thresholdCm,
+  pinLockEnabled,
+  onExpand,
+  onCollapse,
+  onStartMonitoring,
   onPlaybackSyncMessage,
 }: YouTubeSafePlayerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -122,7 +153,6 @@ export function YouTubeSafePlayer({
         const YT = await loadYouTubeIframeAPI();
         if (cancelled || !hostRef.current) return;
 
-        // Create a dedicated inner mount node so YT.Player iframe replacement stays clean
         const mountNode = document.createElement('div');
         mountNode.className = 'w-full h-full';
         hostRef.current.innerHTML = '';
@@ -151,16 +181,13 @@ export function YouTubeSafePlayer({
               if (cancelled) return;
               const state = event.data;
               if (state === 1 || state === 3) {
-                // PLAYING or BUFFERING
                 if (blackoutRef.current) {
-                  // Enforce immediate pause if somehow triggered during blackout
                   wasPlayingBeforeBlackoutRef.current = true;
                   event.target.pauseVideo();
                 } else {
                   isPlayingRef.current = true;
                 }
               } else if (state === 2 || state === 0) {
-                // PAUSED or ENDED (only mark manually paused if not caused by blackout)
                 if (!blackoutRef.current) {
                   isPlayingRef.current = false;
                 }
@@ -270,9 +297,100 @@ export function YouTubeSafePlayer({
     }
   }, [isBlackoutActive, onPlaybackSyncMessage]);
 
+  const distanceText =
+    distanceCm !== null && isMonitoring ? `${Math.round(distanceCm)} cm` : '-- cm';
+
+  const isTooClose =
+    status === 'too_close' || status === 'locked' || status === 'recovering';
+
   return (
-    <div className="relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-      <div ref={hostRef} className="w-full h-full" />
+    <div
+      className={
+        isExpanded
+          ? 'fixed inset-0 w-[100vw] h-[100dvh] bg-[#000000] z-40 flex items-center justify-center'
+          : 'relative w-full aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-200 shadow-sm'
+      }
+    >
+      {/* Edge-to-edge Floating Semi-Transparent Top Status Bar */}
+      {isExpanded && (
+        <div className="fixed top-0 inset-x-0 z-20 pt-safe px-3 sm:px-5 pt-2.5 pointer-events-none flex items-start justify-between gap-2">
+          {/* Distance status indicator */}
+          <div className="pointer-events-auto min-h-[44px] px-3.5 py-2 rounded-2xl bg-black/65 backdrop-blur-md border border-white/15 text-white flex items-center gap-2.5 shadow-lg">
+            {!isMonitoring ? (
+              <>
+                <Camera className="w-4 h-4 text-slate-300 shrink-0" aria-hidden="true" />
+                <span className="text-xs font-medium text-slate-200 whitespace-nowrap">
+                  Bảo vệ đang tắt
+                </span>
+                <button
+                  type="button"
+                  onClick={onStartMonitoring}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Play className="w-3 h-3 fill-current" aria-hidden="true" />
+                  <span>Bật</span>
+                </button>
+              </>
+            ) : status === 'no_face' ? (
+              <>
+                <Eye className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />
+                <span className="text-xs font-medium text-amber-200 whitespace-nowrap">
+                  Đang tìm mặt · Ngưỡng {thresholdCm} cm
+                </span>
+              </>
+            ) : isTooClose ? (
+              <>
+                <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" aria-hidden="true" />
+                <span className="font-mono text-xs font-semibold tabular-nums text-red-300 whitespace-nowrap">
+                  {distanceText} · Quá gần
+                </span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                <span className="font-mono text-xs font-semibold tabular-nums text-white whitespace-nowrap">
+                  {distanceText}
+                </span>
+                <span className="text-[11px] text-emerald-300 font-medium whitespace-nowrap hidden sm:inline">
+                  · An toàn (≥ {thresholdCm} cm)
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Collapse ("Thu nhỏ") button */}
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="pointer-events-auto min-h-[44px] px-3.5 py-2 rounded-2xl bg-black/70 hover:bg-black/85 active:scale-[0.98] backdrop-blur-md border border-white/20 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-lg transition-all whitespace-nowrap shrink-0"
+          >
+            <Minimize2 className="w-4 h-4" aria-hidden="true" />
+            <span>Thu nhỏ</span>
+            {pinLockEnabled && (
+              <Lock className="w-3.5 h-3.5 text-amber-300" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Expand ("Tràn màn hình") button at top-right corner in normal inline mode */}
+      {!isExpanded && (
+        <button
+          type="button"
+          onClick={onExpand}
+          aria-label="Mở chế độ xem tràn màn hình"
+          className="absolute top-2.5 right-2.5 z-10 min-h-[44px] px-3 py-2 rounded-xl bg-slate-950/75 hover:bg-slate-950/90 active:scale-[0.98] backdrop-blur-md border border-white/15 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap"
+        >
+          <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>Tràn màn hình</span>
+        </button>
+      )}
+
+      {/* YouTube Player Host (remains mounted continuously across mode switches) */}
+      <div
+        ref={hostRef}
+        className={isExpanded ? 'w-full h-full' : 'w-full h-full'}
+      />
 
       {apiLoading && !embedError && (
         <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-4 text-center">
